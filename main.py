@@ -2,6 +2,19 @@ from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 
+
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # .env 파일에서 환경변수 읽기
+
+DB_HOST = os.getenv("DB_HOST")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
+DB_NAME = os.getenv("DB_NAME")
+
+
+
 app = FastAPI()
 
 # ✅ CORS 설정
@@ -23,11 +36,12 @@ app.add_middleware(
 # ✅ DB 연결 함수
 def get_connection():
     return mysql.connector.connect(
-        host="history-database.mysql.database.azure.com",
-        user="history6b013",
-        password="Love95120!",
-        database="history"
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
     )
+
 
 # ✅ 1. 요약 저장
 @app.post("/save-summary")
