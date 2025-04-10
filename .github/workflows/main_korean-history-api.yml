@@ -1,20 +1,20 @@
-name: Deploy FastAPI App to Azure Web App
+name: Deploy FastAPI to Azure
 
 on:
   push:
     branches:
-      - main
+      - main # 또는 배포할 브랜치
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Check out the code
         uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
@@ -23,16 +23,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Upload artifact for deployment
-        uses: actions/upload-artifact@v3
-        with:
-          name: python-app
-          path: .
-
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v2
         with:
-          app-name: korean-history-api
-          slot-name: production
+          app-name: korean-history-api # Azure Web App 이름
           publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           package: .
