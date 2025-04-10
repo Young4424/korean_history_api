@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Form
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
+import uvicorn
 
 
 from dotenv import load_dotenv
@@ -175,3 +176,11 @@ def get_wrong_answers(user_id: int):
     except Exception as e:
         print("❗오답 조회 오류:", str(e))
         return {"status": "error", "detail": str(e)}
+    
+
+
+
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000)
+
