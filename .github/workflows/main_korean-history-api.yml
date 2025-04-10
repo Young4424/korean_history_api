@@ -32,13 +32,12 @@ jobs:
         run: |
           zip -r release.zip . -x "venv/*" "__pycache__/*" ".git/*"
 
-      - name: Azure 로그인
+      - name: "Login to Azure using service principal"
         uses: azure/login@v2
         with:
-          auth-type: "service-principal" # 👈 명시적 지정
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          client-secret: ${{ secrets.AZURE_CLIENT_SECRET }}
 
       - name: Deploy to Azure Web App
         uses: azure/webapps-deploy@v3
