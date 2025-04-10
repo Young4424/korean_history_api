@@ -10,6 +10,10 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
 
+    permissions: # ✅ 필수!
+      id-token: write
+      contents: read
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -28,7 +32,7 @@ jobs:
         run: |
           zip -r release.zip . -x "venv/*" "__pycache__/*" ".git/*"
 
-      - name: Log in to Azure using Service Principal
+      - name: Azure 로그인
         uses: azure/login@v2
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
