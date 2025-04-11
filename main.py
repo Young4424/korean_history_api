@@ -184,3 +184,26 @@ def get_wrong_answers(user_id: int):
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
 
+
+
+@app.get("/get-next-wrong-question")
+def get_next_wrong_question(user_id: int):
+    conn = get_connection()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT q.question_id, q.question_text, q.choice1, q.choice2, q.choice3, q.choice4, q.answer
+        FROM user_answers ua
+        JOIN questions q ON ua.question_id = q.question_id
+        WHERE ua.user_id = %s AND ua.is_correct = FALSE
+        ORDER BY ua.answer_id DESC
+        LIMIT 1
+    """, (user_id,))
+    question = cursor.fetchone()
+    cursor.close()
+    conn.close()
+
+    if question:
+        return {"question": question}
+    else:
+        return {"message": "더 이상 오답이 없습니다."}
+
