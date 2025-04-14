@@ -1,20 +1,28 @@
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import mysql.connector
 import uvicorn
-
+import os
+import shutil
+from datetime import datetime
+from typing import Optional
 
 from dotenv import load_dotenv
 import os
 
-load_dotenv()  # .env 파일에서 환경변수 읽기
+load_dotenv()  # .env 파일에서 환경변수 읽기ㄴㄴ
 
 DB_HOST = os.getenv("DB_HOST")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_NAME = os.getenv("DB_NAME")
 
+# 이미지 저장 경로 설정
+UPLOAD_DIR = os.getenv("UPLOAD_DIR", "./uploads")
+IMAGE_DIR = os.path.join(UPLOAD_DIR, "images")
 
+# 디렉토리가 없으면 생성
+os.makedirs(IMAGE_DIR, exist_ok=True)
 
 app = FastAPI()
 
@@ -177,15 +185,6 @@ def get_wrong_answers(user_id: int):
         print("❗오답 조회 오류:", str(e))
         return {"status": "error", "detail": str(e)}
     
-
-
-
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000)
-
-
-
 @app.get("/get-next-wrong-question")
 def get_next_wrong_question(user_id: int):
     conn = get_connection()
@@ -206,4 +205,259 @@ def get_next_wrong_question(user_id: int):
         return {"question": question}
     else:
         return {"message": "더 이상 오답이 없습니다."}
+    
+# ✅ study_materials 테이블 확장용 API (추가)
+@app.post("/alter-study-materials-table")
+def alter_study_materials_table():
+    """study_materials 테이블에 필기노트 분석에 필요한 필드를 추가합니다."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        # 컬럼 존재 여부 확인 후 추가
+        cursor.execute("""
+            SELECT COUNT(*) 
+            FROM INFORMATION_SCHEMA.COLUMNS 
+            WHERE TABLE_NAME = 'study_materials' AND COLUMN_NAME = 'analysis_type'
+        """)
+        exists = cursor.fetchone()[0]
+        
+        if not exists:
+            cursor.execute("""
+                ALTER TABLE study_materials
+                ADD COLUMN analysis_type VARCHAR(50) DEFAULT 'summary' COMMENT '분석 유형 (summary, note_analysis)',
+                ADD COLUMN ocr_text TEXT DEFAULT NULL COMMENT 'OCR을 통해 추출된 원본 텍스트',
+                ADD COLUMN length_option VARCHAR(50) DEFAULT NULL COMMENT '요약 길이 옵션'
+            """)
+            cursor.execute("""
+                CREATE INDEX idx_study_materials_analysis_type ON study_materials(analysis_type)
+            """)
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "success", "message": "테이블이 확장되었습니다."}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
+# ✅ 필기노트 분석 결과 저장 API
+@app.post("/save-note-analysis")
+def save_note_analysis(
+    user_id: int = Form(...),
+    file_name: str = Form(...),
+    ocr_text: str = Form(...),
+    summary: str = Form(...),
+    tts_audio_url: str = Form(...),
+    voice_style: str = Form(...),
+    speed: str = Form(...),
+    duration: int = Form(...),
+    length_option: str = Form(...)
+):
+    """필기노트 분석 결과를 study_materials 테이블에 저장합니다."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO study_materials 
+            (user_id, file_name, summary, tts_audio_url, voice_style, speed, duration, 
+             analysis_type, ocr_text, length_option)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, file_name, summary, tts_audio_url, voice_style, speed, duration, 
+             'note_analysis', ocr_text, length_option)
+        )
+        material_id = cursor.lastrowid
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "success", "material_id": material_id}
+    except Exception as e:
+        print("❗필기노트 분석 저장 오류:", str(e))
+        return {"status": "error", "detail": str(e)}
+
+# ✅ 필기노트 분석 결과 불러오기 API
+@app.get("/get-note-analysis")
+def get_note_analysis(user_id: int, limit: int = 5):
+    """특정 사용자의 필기노트 분석 결과 목록을 가져옵니다."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT material_id, file_name, summary, tts_audio_url, voice_style, 
+                   speed, duration, ocr_text, uploaded_at
+            FROM study_materials
+            WHERE user_id = %s AND analysis_type = 'note_analysis'
+            ORDER BY uploaded_at DESC
+            LIMIT %s
+            """,
+            (user_id, limit)
+        )
+        results = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"analysis_results": results}
+    except Exception as e:
+        print("❗필기노트 분석 결과 조회 오류:", str(e))
+        return {"status": "error", "detail": str(e)}
+
+# ✅ 특정 분석 결과 상세 조회 API
+@app.get("/get-note-analysis-detail/{material_id}")
+def get_note_analysis_detail(material_id: int):
+    """특정 필기노트 분석 결과의 상세 정보를 가져옵니다."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT * FROM study_materials
+            WHERE material_id = %s AND analysis_type = 'note_analysis'
+            """,
+            (material_id,)
+        )
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        
+        if result:
+            return {"analysis_detail": result}
+        else:
+            return {"status": "error", "detail": "분석 결과를 찾을 수 없습니다."}
+    except Exception as e:
+        print(f"❗분석 결과 상세 조회 오류 (ID: {material_id}):", str(e))
+        return {"status": "error", "detail": str(e)}
+
+# ✅ 필기노트 분석 결과 삭제 API
+@app.delete("/delete-note-analysis/{material_id}")
+def delete_note_analysis(material_id: int):
+    """특정 필기노트 분석 결과를 삭제합니다."""
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM study_materials
+            WHERE material_id = %s AND analysis_type = 'note_analysis'
+            """,
+            (material_id,)
+        )
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        if deleted:
+            return {"status": "success", "message": "분석 결과가 삭제되었습니다."}
+        else:
+            return {"status": "error", "detail": "삭제할 분석 결과를 찾을 수 없습니다."}
+    except Exception as e:
+        print(f"❗분석 결과 삭제 오류 (ID: {material_id}):", str(e))
+        return {"status": "error", "detail": str(e)}
+
+# 새로 추가: 필기 이미지 업로드 API
+@app.post("/upload-note-image")
+async def upload_note_image(file: UploadFile = File(...), user_id: int = Form(...)):
+    """
+    필기 이미지를 서버에 저장하고 파일 경로를 반환합니다.
+    """
+    try:
+        # 고유한 파일명 생성 (중복 방지)
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        file_extension = os.path.splitext(file.filename)[1]
+        unique_filename = f"{user_id}_{timestamp}{file_extension}"
+        file_path = os.path.join(IMAGE_DIR, unique_filename)
+        
+        # 파일 저장
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # 상대 경로 (DB에 저장할 경로)
+        relative_path = os.path.join("images", unique_filename)
+        
+        return {
+            "status": "success",
+            "file_name": file.filename,
+            "saved_path": relative_path,
+            "full_path": file_path
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이미지 업로드 실패: {str(e)}")
+
+# 새로 추가: 필기노트 OCR 결과 저장 API
+@app.post("/save-note-ocr")
+async def save_note_ocr(
+    user_id: int = Form(...),
+    file_name: str = Form(...),
+    image_path: str = Form(...),
+    ocr_text: str = Form(...)
+):
+    """
+    필기노트 OCR 결과만 임시로 저장합니다.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO study_materials 
+            (user_id, file_name, ocr_text, analysis_type)
+            VALUES (%s, %s, %s, %s)
+            """,
+            (user_id, file_name, ocr_text, "ocr_only")
+        )
+        material_id = cursor.lastrowid
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {"status": "success", "material_id": material_id, "ocr_text": ocr_text}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OCR 결과 저장 실패: {str(e)}")
+
+# 새로 추가: OCR과 요약 결과를 함께 저장하는 API
+@app.post("/save-note-analysis-complete")
+async def save_note_analysis_complete(
+    user_id: int = Form(...),
+    file_name: str = Form(...),
+    image_path: str = Form(...),
+    ocr_text: str = Form(...),
+    summary: str = Form(...),
+    tts_audio_url: str = Form(None),  # 선택적 필드
+    voice_style: str = Form(...),
+    speed: str = Form(...),
+    duration: int = Form(...),
+    length_option: str = Form(...)
+):
+    """
+    필기노트의 OCR 결과와 요약 결과를 함께 저장합니다.
+    """
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        
+        # tts_audio_url이 None이면 빈 문자열로 저장
+        audio_url = tts_audio_url if tts_audio_url else ""
+        
+        cursor.execute(
+            """
+            INSERT INTO study_materials 
+            (user_id, file_name, summary, tts_audio_url, voice_style, speed, duration, 
+             analysis_type, ocr_text, length_option)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """,
+            (user_id, file_name, summary, audio_url, voice_style, speed, duration, 
+             'note_analysis', ocr_text, length_option)
+        )
+        material_id = cursor.lastrowid
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {
+            "status": "success", 
+            "material_id": material_id,
+            "message": "분석 결과가 저장되었습니다."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"분석 결과 저장 실패: {str(e)}")
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -1,6 +1,21 @@
-fastapi
-uvicorn
-gunicorn
-mysql-connector-python
-python-dotenv
-python-multipart
+# FastAPI 및 백엔드 관련
+fastapi==0.110.0
+uvicorn==0.27.1
+python-multipart==0.0.9
+mysql-connector-python==8.2.0
+python-dotenv==1.0.1
+requests==2.31.0
+
+# Gradio 및 프론트엔드 관련
+gradio==4.19.2
+pillow==10.2.0
+
+# Azure 관련
+azure-cognitiveservices-speech==1.35.0
+openai==1.14.0
+
+# 유틸리티
+python-jose==3.3.0  # JWT 토큰 인증 (선택사항)
+passlib==1.7.4      # 비밀번호 해싱 (선택사항)
+pydantic==2.6.1
+aiofiles==23.2.1    # 비동기 파일 처리
