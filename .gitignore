@@ -1,3 +1,2 @@
-.env
-*.ipynb_checkpoints
-__pycache__/
+/250409_AzureDB+_gradio.ipynb
+/FastAPI_Azure_MySQL_Template.ipynb

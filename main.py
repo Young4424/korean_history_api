@@ -49,7 +49,12 @@ def get_connection():
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME
+        host=DB_HOST,
+        user=DB_USER,
+        password=DB_PASSWORD,
+        database=DB_NAME
     )
+
 
 
 # ✅ 1. 요약 저장
