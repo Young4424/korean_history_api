@@ -1,2 +1,9 @@
 /250409_AzureDB+_gradio.ipynb
 /FastAPI_Azure_MySQL_Template.ipynb
+/250414_AzureDB+_gradio.ipynb
+
+__pycache__/
+*.pyc
+.env
+
+
