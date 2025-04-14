@@ -1,6 +1,10 @@
 # FastAPI 및 백엔드 관련
-fastapi==0.110.0
-uvicorn==0.27.1
+fastapi
+uvicorn
+gunicorn
+sqlalchemy
+pymysql
+python-dotenv
 python-multipart==0.0.9
 mysql-connector-python==8.2.0
 python-dotenv==1.0.1
