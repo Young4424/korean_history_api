@@ -33,13 +33,7 @@ os.makedirs(AUDIO_SAVE_DIR, exist_ok=True)
 app = FastAPI()
 
 # ✅ CORS 설정
-origins = [
-    "http://localhost",
-    "http://127.0.0.1",
-    "http://localhost:7860",  # Gradio 기본 포트
-    "*"  # 전체 허용 (개발 중에는 OK, 배포 시엔 특정 origin만 허용 권장)
 
-]
 
 
 # ✅ 정적 파일 서빙 (오디오)
@@ -47,7 +41,7 @@ app.mount("/static/audio", StaticFiles(directory=AUDIO_SAVE_DIR), name="audio")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
