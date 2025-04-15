@@ -94,7 +94,8 @@ def save_question(
     choice3: str = Form(...),
     choice4: str = Form(...),
     answer: int = Form(...),
-    explanation: str = Form(...)
+    explanation: str = Form(...),
+    period: str = Form(...)  # ✅ 추가
 ):
     try:
         conn = get_connection()
@@ -102,10 +103,10 @@ def save_question(
         cursor.execute(
             """
             INSERT INTO questions 
-            (material_id, question_text, choice1, choice2, choice3, choice4, answer, explanation)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            (material_id, question_text, choice1, choice2, choice3, choice4, answer, explanation, period)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
-            (material_id, question_text, choice1, choice2, choice3, choice4, answer, explanation)
+            (material_id, question_text, choice1, choice2, choice3, choice4, answer, explanation, period)
         )
         question_id = cursor.lastrowid
         conn.commit()
@@ -113,8 +114,8 @@ def save_question(
         conn.close()
         return {"status": "question saved", "question_id": question_id}
     except Exception as e:
-        print("❗문제 저장 오류:", str(e))
         return {"status": "error", "detail": str(e)}
+
 
 # ✅ 3. 정답 저장
 @app.post("/save-answer")
@@ -196,6 +197,29 @@ def get_wrong_answers(user_id: int):
         print("❗오답 조회 오류:", str(e))
         return {"status": "error", "detail": str(e)}
 
+
+# 가장 최근의 study_materials에서 생성된 ID를 가져오는 API
+@app.get("/get-latest-material-id")
+def get_latest_material_id(user_id: int):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT material_id 
+            FROM study_materials 
+            WHERE user_id = %s 
+            ORDER BY uploaded_at DESC 
+            LIMIT 1
+        """, (user_id,))
+        result = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if result:
+            return {"material_id": result[0]}
+        else:
+            return {"error": "No material found for this user"}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 
