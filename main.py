@@ -2,6 +2,8 @@ from fastapi import FastAPI, Form, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi import Path
+
 import mysql.connector
 import uvicorn
 import os
@@ -170,6 +172,7 @@ def save_wrong_answer(
         return {"status": "error", "detail": str(e)}
 
 # ✅ 5. 오답 목록 불러오기
+# 오답 조회 시 answer_id도 반환하도록 수정
 @app.get("/get-wrong-answers")
 def get_wrong_answers(user_id: int):
     try:
@@ -178,6 +181,7 @@ def get_wrong_answers(user_id: int):
         cursor.execute(
             """
             SELECT 
+                ua.answer_id,
                 q.question_text,
                 q.choice1, q.choice2, q.choice3, q.choice4,
                 q.answer, q.explanation, q.period,
@@ -196,6 +200,37 @@ def get_wrong_answers(user_id: int):
     except Exception as e:
         print("❗오답 조회 오류:", str(e))
         return {"status": "error", "detail": str(e)}
+
+
+
+
+# ✅ 6. 오답 삭제 API (프론트에서 삭제 버튼 클릭 시 DB에서도 제거되도록)
+from fastapi import Path
+
+@app.delete("/delete-wrong-answer/{user_answer_id}")
+def delete_wrong_answer(user_answer_id: int = Path(...)):
+    try:
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM user_answers
+            WHERE answer_id = %s AND is_correct = FALSE
+            """,
+            (user_answer_id,)
+        )
+        deleted = cursor.rowcount > 0
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        if deleted:
+            return {"status": "success", "message": "오답이 삭제되었습니다."}
+        else:
+            return {"status": "error", "detail": "삭제할 오답을 찾을 수 없습니다."}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
 
 
 # 가장 최근의 study_materials에서 생성된 ID를 가져오는 API
