@@ -3,8 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi import Path
-
 import mysql.connector
+
+
 import uvicorn
 import os
 import shutil
@@ -14,6 +15,10 @@ from typing import Optional
 
 from dotenv import load_dotenv
 import os
+
+
+
+
 
 load_dotenv()  # .env 파일에서 환경변수 읽지 않게 하기
 
@@ -170,6 +175,26 @@ def save_wrong_answer(
     except Exception as e:
         print("❗오답 저장 오류:", str(e))
         return {"status": "error", "detail": str(e)}
+
+# 프론트엔드에서 해설 받고 저장하기
+@app.post("/update-question-explanation")
+def update_question_explanation(
+    question_id: int = Form(...),
+    explanation: str = Form(...)
+):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE questions SET explanation = %s WHERE question_id = %s",
+        (explanation, question_id)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return {"status": "updated"}
+
+
+
 
 # ✅ 5. 오답 목록 불러오기
 # 오답 조회 시 answer_id도 반환하도록 수정
